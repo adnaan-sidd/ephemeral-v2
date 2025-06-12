@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { PLANS } from "@shared/schema";
 import { useLocation } from "wouter";
+import GitHubAuth from "./github-auth";
 
 interface AuthModalProps {
   open: boolean;
@@ -64,6 +65,11 @@ export default function AuthModal({ open, onOpenChange, mode, onModeChange }: Au
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleGitHubSuccess = () => {
+    onOpenChange(false);
+    setLocation('/dashboard');
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -72,6 +78,17 @@ export default function AuthModal({ open, onOpenChange, mode, onModeChange }: Au
             {mode === 'login' ? 'Welcome Back' : 'Get Started'}
           </DialogTitle>
         </DialogHeader>
+        
+        <GitHubAuth mode={mode} onSuccess={handleGitHubSuccess} />
+        
+        <div className="relative my-4">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-slate-200 dark:border-slate-700"></div>
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-2 bg-white dark:bg-gray-900 text-slate-500">Or continue with email</span>
+          </div>
+        </div>
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -134,8 +151,8 @@ export default function AuthModal({ open, onOpenChange, mode, onModeChange }: Au
           </Button>
         </form>
         
-        <div className="text-center text-sm">
-          <span className="text-slate-600">
+        <div className="text-center text-sm mt-4">
+          <span className="text-slate-600 dark:text-slate-400">
             {mode === 'login' ? "Don't have an account? " : "Already have an account? "}
           </span>
           <button

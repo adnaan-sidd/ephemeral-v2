@@ -19,7 +19,9 @@ import {
   Trash2,
   CreditCard,
   Settings,
-  ExternalLink
+  ExternalLink,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import Navigation from "@/components/navigation";
 import { useAuth } from "@/lib/auth";
@@ -34,6 +36,13 @@ export default function Dashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [newApiKeyName, setNewApiKeyName] = useState("");
+  const [pipelineForm, setPipelineForm] = useState({
+    repoUrl: "",
+    branch: "main",
+    commands: "npm install\nnpm test\nnpm run build"
+  });
+  const [isSubmittingPipeline, setIsSubmittingPipeline] = useState(false);
+  const [visibleApiKeys, setVisibleApiKeys] = useState<Record<string, boolean>>({}); // Track which API keys are visible
 
   useEffect(() => {
     if (!user || !token) {
@@ -85,11 +94,52 @@ export default function Dashboard() {
       return response.json();
     },
     onSuccess: (data) => {
+      // Store the full API key in our visible keys state
+      setVisibleApiKeys(prev => ({
+        ...prev,
+        [data.id]: true
+      }));
+      
+      // Store the full key in local memory for this session
+      queryClient.setQueryData(['/api/user/api-keys'], (oldData: any) => {
+        if (!oldData) return [{ 
+          ...data, 
+          fullKey: data.key,
+          partialKey: data.key.substring(0, 6) + '••••••••••••••••••••••••••••' + data.key.substring(data.key.length - 4)
+        }];
+        
+        return [
+          { 
+            ...data, 
+            fullKey: data.key,
+            partialKey: data.key.substring(0, 6) + '••••••••••••••••••••••••••••' + data.key.substring(data.key.length - 4)
+          },
+          ...oldData
+        ];
+      });
+      
+      // Show toast with copy button
       toast({
         title: "API Key Created",
-        description: "Your new API key has been generated. Copy it now as it won't be shown again.",
+        description: (
+          <div className="mt-2">
+            <p className="mb-2">Your new API key has been generated. Copy it now as it won't be shown again.</p>
+            <div className="flex items-center space-x-2 bg-slate-100 p-2 rounded font-mono text-sm overflow-auto">
+              <code className="flex-1">{data.key}</code>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => copyToClipboard(data.key)}
+                className="h-8 px-2 text-slate-600"
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        ),
+        duration: 10000, // Show for 10 seconds to give time to copy
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/user/api-keys'] });
+      
       setNewApiKeyName("");
     },
     onError: (error: any) => {
@@ -155,8 +205,92 @@ export default function Dashboard() {
     navigator.clipboard.writeText(text);
     toast({
       title: "Copied!",
-      description: "API key copied to clipboard.",
+      description: "Text copied to clipboard.",
     });
+  };
+  
+  const toggleApiKeyVisibility = (id: string, fullKey?: string) => {
+    // If we don't have the full key, we can't show it
+    if (!fullKey) {
+      toast({
+        title: "Unable to show full API key",
+        description: "For security reasons, the full API key is only available right after creation.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setVisibleApiKeys(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
+
+  const handleTestPipeline = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!pipelineForm.repoUrl.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a repository URL.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const commands = pipelineForm.commands
+      .split('\n')
+      .map(cmd => cmd.trim())
+      .filter(cmd => cmd);
+    
+    if (commands.length === 0) {
+      toast({
+        title: "Error",
+        description: "Please enter at least one command.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsSubmittingPipeline(true);
+    
+    try {
+      const response = await fetch('/api/user/test-pipeline', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          repoUrl: pipelineForm.repoUrl,
+          branch: pipelineForm.branch,
+          commands
+        })
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to create pipeline');
+      }
+      
+      const data = await response.json();
+      
+      toast({
+        title: "Pipeline Created",
+        description: `Pipeline ID: ${data.id} has been created and is now running.`,
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ['/api/user/pipelines'] });
+      
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmittingPipeline(false);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -293,8 +427,16 @@ export default function Dashboard() {
 
             {/* Recent Pipelines */}
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Recent Pipelines</CardTitle>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="gap-1"
+                  onClick={() => document.getElementById('test-pipeline-form')?.scrollIntoView({ behavior: 'smooth' })}
+                >
+                  <Play className="h-4 w-4" /> Test Pipeline
+                </Button>
               </CardHeader>
               <CardContent>
                 {pipelines && pipelines.length > 0 ? (
@@ -333,6 +475,79 @@ export default function Dashboard() {
                 )}
               </CardContent>
             </Card>
+            
+            {/* Test Pipeline Form */}
+            <Card id="test-pipeline-form">
+              <CardHeader>
+                <CardTitle>Test Pipeline</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleTestPipeline} className="space-y-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="repo-url">Repository URL</Label>
+                    <Input 
+                      id="repo-url" 
+                      placeholder="https://github.com/username/repo" 
+                      value={pipelineForm.repoUrl}
+                      onChange={(e) => setPipelineForm(prev => ({ ...prev, repoUrl: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="branch">Branch</Label>
+                    <Input 
+                      id="branch" 
+                      placeholder="main" 
+                      value={pipelineForm.branch}
+                      onChange={(e) => setPipelineForm(prev => ({ ...prev, branch: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="commands">Commands (one per line)</Label>
+                    <textarea 
+                      id="commands" 
+                      rows={5}
+                      className="w-full border rounded-md p-2"
+                      placeholder="npm install
+npm test
+npm run build"
+                      value={pipelineForm.commands}
+                      onChange={(e) => setPipelineForm(prev => ({ ...prev, commands: e.target.value }))}
+                      required
+                    ></textarea>
+                  </div>
+                  <Button className="w-full" type="submit" disabled={isSubmittingPipeline}>
+                    {isSubmittingPipeline ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Running Pipeline...
+                      </>
+                    ) : (
+                      <>
+                        <Play className="h-4 w-4 mr-2" /> Run Pipeline
+                      </>
+                    )}
+                  </Button>
+                  <div className="text-sm text-slate-500 mt-2">
+                    <p>This will count towards your monthly pipeline runs quota. To automate, use the API with your API key.</p>
+                    <div className="mt-3 bg-slate-100 p-3 rounded-md font-mono text-xs overflow-auto">
+                      <pre>{`curl -X POST https://yourdomain.com/api/v1/pipelines \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "repoUrl": "https://github.com/username/repo",
+    "branch": "main", 
+    "commands": ["npm install", "npm test", "npm run build"]
+  }'`}</pre>
+                    </div>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* API Keys Tab */}
@@ -363,8 +578,8 @@ export default function Dashboard() {
                       <div key={apiKey.id} className="flex items-center justify-between p-4 border rounded-lg">
                         <div>
                           <div className="font-medium text-slate-900">{apiKey.name}</div>
-                          <div className="text-sm text-slate-500 font-mono">
-                            {apiKey.partialKey}
+                          <div className="text-sm text-slate-500 font-mono flex items-center">
+                            {visibleApiKeys[apiKey.id] && apiKey.fullKey ? apiKey.fullKey : apiKey.partialKey}
                           </div>
                           <div className="text-sm text-slate-500">
                             Last used: {apiKey.lastUsedAt ? formatDistanceToNow(new Date(apiKey.lastUsedAt), { addSuffix: true }) : 'Never'}
@@ -374,7 +589,20 @@ export default function Dashboard() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => copyToClipboard(apiKey.partialKey)}
+                            onClick={() => toggleApiKeyVisibility(apiKey.id, apiKey.fullKey)}
+                            title={visibleApiKeys[apiKey.id] ? "Hide API key" : "Show API key"}
+                          >
+                            {visibleApiKeys[apiKey.id] ? (
+                              <EyeOff className="h-4 w-4 text-slate-500" />
+                            ) : (
+                              <Eye className="h-4 w-4 text-slate-500" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => copyToClipboard(visibleApiKeys[apiKey.id] && apiKey.fullKey ? apiKey.fullKey : apiKey.partialKey)}
+                            title="Copy API key"
                           >
                             <Copy className="h-4 w-4" />
                           </Button>
@@ -383,6 +611,7 @@ export default function Dashboard() {
                             size="sm"
                             onClick={() => deleteApiKeyMutation.mutate(apiKey.id)}
                             disabled={deleteApiKeyMutation.isPending}
+                            title="Delete API key"
                           >
                             <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
