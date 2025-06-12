@@ -7,6 +7,7 @@ import Stripe from "stripe";
 import { storage } from "./storage";
 import { insertUserSchema, insertPipelineSchema, PLANS, PlanType } from "@shared/schema";
 import { z } from "zod";
+import { setupSocketIO } from "./socket";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-super-secret-jwt-key-min-32-chars";
 const API_KEY_SALT = process.env.API_KEY_SALT || "your-api-key-salt-for-hashing";
@@ -425,11 +426,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(400).json({ message: error.message });
     }
   });
-
   const httpServer = createServer(app);
-  return httpServer;
-}
-
+  
+  // Setup Socket.io server
+  const socketIO = setupSocketIO(httpServer);
 // Simplified pipeline execution
 async function executePipeline(pipelineId: string, pipelineData: any) {
   try {
@@ -442,6 +442,13 @@ async function executePipeline(pipelineId: string, pipelineData: any) {
     // Update status to running
     await storage.updatePipelineStatus(pipelineId, 'running', new Date());
     
+    // Emit initial status update
+    socketIO.emitBuildStatus(pipelineId, {
+      status: 'running',
+      progress: 0,
+      startedAt: new Date().toISOString()
+    });
+    
     // Simulate build process (in real implementation, this would use Docker)
     const logs = [
       `[${new Date().toISOString()}] 🔧 Setting up ephemeral environment...`,
@@ -450,27 +457,78 @@ async function executePipeline(pipelineId: string, pipelineData: any) {
       `[${new Date().toISOString()}] ⚡ Starting build process...`
     ];
     
+    // Emit initial logs
+    socketIO.emitBuildLogs(pipelineId, logs.join('\n') + '\n');
+    
+    // Calculate total steps for progress tracking
+    const totalSteps = (pipelineData.commands || []).length;
+    let completedSteps = 0;
+    
     for (const command of pipelineData.commands || []) {
-      logs.push(`[${new Date().toISOString()}] $ ${command}`);
+      const commandStartLog = `[${new Date().toISOString()}] $ ${command}`;
+      logs.push(commandStartLog);
+      
+      // Emit log update in real-time
+      socketIO.emitBuildLogs(pipelineId, commandStartLog + '\n');
+      
       // Simulate command execution delay
       await new Promise(resolve => setTimeout(resolve, 1000));
-      logs.push(`[${new Date().toISOString()}] ✅ Command completed successfully`);
+      
+      const commandCompleteLog = `[${new Date().toISOString()}] ✅ Command completed successfully`;
+      logs.push(commandCompleteLog);
+      
+      // Emit log update in real-time
+      socketIO.emitBuildLogs(pipelineId, commandCompleteLog + '\n');
+      
+      // Update progress
+      completedSteps++;
+      const progress = Math.round((completedSteps / totalSteps) * 100);
+      
+      // Emit progress update
+      socketIO.emitBuildStatus(pipelineId, {
+        status: 'running',
+        progress
+      });
     }
     
-    logs.push(`[${new Date().toISOString()}] 🎉 Build completed successfully!`);
-    logs.push(`[${new Date().toISOString()}] 🧹 Cleaning up ephemeral environment...`);
+    const completionLogs = [
+      `[${new Date().toISOString()}] 🎉 Build completed successfully!`,
+      `[${new Date().toISOString()}] 🧹 Cleaning up ephemeral environment...`
+    ];
+    
+    logs.push(...completionLogs);
+    
+    // Emit final logs
+    socketIO.emitBuildLogs(pipelineId, completionLogs.join('\n') + '\n');
     
     const duration = Math.floor(Math.random() * 300) + 30; // 30-330 seconds
+    const finishedAt = new Date();
     
     // Update pipeline as completed
     await storage.updatePipelineStatus(
       pipelineId, 
       'completed', 
       new Date(), 
-      new Date(), 
+      finishedAt, 
       duration,
       logs.join('\n')
     );
+    
+    // Emit final status update
+    socketIO.emitBuildStatus(pipelineId, {
+      status: 'success',
+      progress: 100,
+      finishedAt: finishedAt.toISOString(),
+      duration
+    });
+    
+    // Emit user notification
+    socketIO.emitNotification(pipeline.userId, {
+      type: 'build_success',
+      title: 'Build completed successfully',
+      message: `Build #${pipelineId} completed in ${Math.floor(duration / 60)}m ${duration % 60}s`,
+      timestamp: new Date().toISOString()
+    });
     
     // Track compute usage (simplified)
     try {
@@ -484,11 +542,40 @@ async function executePipeline(pipelineId: string, pipelineData: any) {
     
   } catch (error) {
     console.error('Pipeline execution failed:', error);
+    
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    // Update pipeline as failed
     await storage.updatePipelineStatus(
       pipelineId, 
       'failed', 
       new Date(), 
       new Date(), 
+      0,
+      `Pipeline failed: ${errorMessage}`
+    );
+    
+    // Emit failure status update
+    socketIO.emitBuildStatus(pipelineId, {
+      status: 'failed',
+      error: errorMessage,
+      finishedAt: new Date().toISOString()
+    });
+    
+    // Emit error logs
+    socketIO.emitBuildLogs(pipelineId, `[${new Date().toISOString()}] ❌ Pipeline failed: ${errorMessage}\n`);
+    
+    // Emit user notification
+    if (pipeline) {
+      socketIO.emitNotification(pipeline.userId, {
+        type: 'build_failed',
+        title: 'Build failed',
+        message: `Build #${pipelineId} failed: ${errorMessage}`,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+}     new Date(), 
       0,
       `Pipeline failed: ${error}`
     );

@@ -1,0 +1,130 @@
+import { motion } from 'framer-motion';
+import { ArrowRight, Play } from 'lucide-react';
+import { flowForgeImages } from '../../utils/images';
+import { Link, useLocation } from 'wouter';
+
+export default function HeroSection() {
+  const [, setLocation] = useLocation();
+
+  return (
+    <section className="relative py-20 overflow-hidden">
+      {/* Background gradient */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-indigo-950 z-0" />
+      
+      {/* Animated particles */}
+      <div className="absolute inset-0 z-0">
+        {[...Array(20)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-2 h-2 bg-blue-500 rounded-full opacity-30 dark:opacity-50"
+            style={{
+              top: `${Math.random() * 100}%`,
+              left: `${Math.random() * 100}%`,
+            }}
+            animate={{
+              y: [0, Math.random() * 30 - 15],
+              x: [0, Math.random() * 30 - 15],
+              opacity: [0.3, 0.6, 0.3],
+            }}
+            transition={{
+              duration: 3 + Math.random() * 5,
+              repeat: Infinity,
+              repeatType: "reverse",
+            }}
+          />
+        ))}
+      </div>
+
+      <div className="container mx-auto px-4 relative z-10">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >
+            <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-violet-600">
+              Ship Code Faster with Ephemeral CI/CD Pipelines
+            </h1>
+            <p className="text-xl text-gray-700 dark:text-gray-300 mb-8">
+              Fresh environments for every build. No more flaky tests or mysterious failures. Just reliable, fast deployments.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row gap-4">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setLocation('/register')}
+                className="flex items-center justify-center px-6 py-3 bg-gradient-to-r from-blue-600 to-violet-600 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all"
+              >
+                Start Free Trial
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </motion.button>
+              
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => window.open('https://www.youtube.com/watch?v=dQw4w9WgXcQ', '_blank')}
+                className="flex items-center justify-center px-6 py-3 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-medium rounded-lg shadow border border-gray-200 dark:border-gray-700 hover:shadow-md transition-all"
+              >
+                <Play className="mr-2 h-5 w-5 text-blue-600 dark:text-blue-400" />
+                Watch Demo
+              </motion.button>
+            </div>
+          </motion.div>
+          
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.4 }}
+            className="relative rounded-2xl overflow-hidden shadow-2xl"
+          >
+            <div className="relative aspect-video">
+              <img 
+                src={flowForgeImages.hero}
+                alt="FlowForge CI/CD Pipeline" 
+                className="object-cover w-full h-full"
+              />
+              <div className="absolute inset-0 bg-gradient-to-tr from-blue-900/40 to-transparent" />
+              
+              {/* Play button overlay */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <motion.div
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => window.open('https://www.youtube.com/watch?v=dQw4w9WgXcQ', '_blank')}
+                  className="bg-white/90 dark:bg-gray-900/90 rounded-full p-4 cursor-pointer shadow-lg"
+                >
+                  <Play className="h-10 w-10 text-blue-600 dark:text-blue-400" />
+                </motion.div>
+              </div>
+            </div>
+            
+            {/* Code snippet */}
+            <div className="absolute bottom-4 right-4 bg-gray-900/90 rounded-lg p-4 shadow-lg w-80 max-w-full text-xs">
+              <div className="flex items-center text-gray-400 mb-2 text-xs">
+                <span className="text-pink-400 mr-2">•</span>
+                <span>flowforge.yml</span>
+              </div>
+              <pre className="text-green-400">
+                <code>{`version: '1'
+pipeline:
+  image: ubuntu:latest
+  ephemeral: true
+  steps:
+    - name: Build
+      run: |
+        npm install
+        npm run build
+    - name: Test
+      run: npm test
+    - name: Deploy
+      if: branch == 'main'
+      run: npx deploy`}</code>
+              </pre>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    </section>
+  );
+}
