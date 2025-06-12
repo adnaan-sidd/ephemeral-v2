@@ -1,0 +1,501 @@
+# FlowForge Simplified - API-First Ephemeral CI/CD Pipeline Service
+
+## Business Overview
+- **Product**: FlowForge - Ephemeral CI/CD Pipeline Service
+- **Market**: $8B DevOps tools market
+- **Revenue**: Subscription SaaS with usage-based billing
+- **Value Prop**: Fresh, isolated environments for every build via API
+
+## Simplified Architecture (DigitalOcean + Serverless)
+
+### Core Components
+1. **Landing Page + Dashboard** (Next.js)
+2. **API Gateway** (DigitalOcean Functions)
+3. **Serverless Functions** (Pipeline orchestration)
+4. **Managed Database** (DigitalOcean Managed PostgreSQL)
+5. **Container Registry** (DigitalOcean Container Registry)
+
+## Tech Stack
+
+### Frontend (Next.js 14 + TypeScript)
+```
+/app/
+├── page.tsx                    # Landing page with pricing
+├── auth/
+│   ├── login/page.tsx         # Sign in
+│   └── register/page.tsx      # Sign up with plan selection
+├── dashboard/
+│   ├── page.tsx               # API keys + usage overview
+│   ├── billing/page.tsx       # Plan management
+│   └── settings/page.tsx      # Account settings
+└── docs/
+    ├── page.tsx               # API documentation
+    └── quickstart/page.tsx    # Getting started
+```
+
+### Backend (Serverless Functions)
+```
+/api/
+├── auth/
+│   ├── register.js           # User registration with plan
+│   ├── login.js              # Authentication
+│   └── refresh.js            # Token refresh
+├── user/
+│   ├── profile.js            # User profile
+│   ├── api-keys.js           # API key management
+│   └── usage.js              # Usage statistics
+├── billing/
+│   ├── plans.js              # Available plans
+│   ├── subscribe.js          # Stripe subscription
+│   └── webhooks.js           # Stripe webhooks
+└── pipelines/
+    ├── create.js             # Create and run pipeline
+    ├── status.js             # Get pipeline status
+    └── logs.js               # Stream logs
+```
+
+## Database Schema (PostgreSQL)
+
+```sql
+-- Users table
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    plan VARCHAR(20) DEFAULT 'free',
+    stripe_customer_id VARCHAR(255),
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- API Keys table
+CREATE TABLE api_keys (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    key_hash VARCHAR(255) NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    last_used_at TIMESTAMP,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Subscriptions table
+CREATE TABLE subscriptions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    stripe_subscription_id VARCHAR(255),
+    plan VARCHAR(20) NOT NULL,
+    status VARCHAR(20) DEFAULT 'active',
+    current_period_end TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Usage tracking table
+CREATE TABLE usage (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    month VARCHAR(7), -- YYYY-MM format
+    pipeline_runs INTEGER DEFAULT 0,
+    compute_minutes INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(user_id, month)
+);
+
+-- Pipelines table
+CREATE TABLE pipelines (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    status VARCHAR(20) DEFAULT 'pending',
+    repo_url VARCHAR(500),
+    branch VARCHAR(100) DEFAULT 'main',
+    commands TEXT[],
+    logs TEXT,
+    started_at TIMESTAMP,
+    completed_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+## Core API Endpoints
+
+### Authentication
+- `POST /api/auth/register` - Register with plan selection
+- `POST /api/auth/login` - User login
+- `POST /api/auth/refresh` - Refresh JWT token
+
+### User Management
+- `GET /api/user/profile` - Get user profile
+- `GET /api/user/api-keys` - List API keys
+- `POST /api/user/api-keys` - Generate new API key
+- `DELETE /api/user/api-keys/:id` - Revoke API key
+- `GET /api/user/usage` - Get usage statistics
+
+### Billing (Stripe Integration)
+- `GET /api/billing/plans` - Available plans
+- `POST /api/billing/subscribe` - Subscribe to plan
+- `POST /api/billing/webhooks` - Stripe webhooks
+
+### Core Pipeline API (Public API for customers)
+- `POST /api/v1/pipelines` - Create and run pipeline
+- `GET /api/v1/pipelines/:id` - Get pipeline status
+- `GET /api/v1/pipelines/:id/logs` - Get pipeline logs
+
+## Pricing Plans
+
+```javascript
+const plans = {
+  free: {
+    name: 'Free',
+    price: 0,
+    pipeline_runs: 50,
+    compute_minutes: 100,
+    concurrent_builds: 1,
+    features: ['Basic CI/CD', 'Community Support']
+  },
+  pro: {
+    name: 'Pro',
+    price: 29,
+    pipeline_runs: 500,
+    compute_minutes: 1000,
+    concurrent_builds: 3,
+    features: ['Advanced CI/CD', 'Priority Support', 'Custom Environments']
+  },
+  enterprise: {
+    name: 'Enterprise',
+    price: 99,
+    pipeline_runs: 2000,
+    compute_minutes: 5000,
+    concurrent_builds: 10,
+    features: ['Unlimited CI/CD', '24/7 Support', 'Custom Integrations', 'SLA']
+  }
+}
+```
+
+## User Flow
+
+### 1. Landing Page Experience
+- Hero section with value proposition
+- Pricing table with plan comparison
+- "Start Free" and "Choose Plan" CTAs
+- Social proof and testimonials
+
+### 2. Registration Flow
+```
+Landing Page → Select Plan → Register → Payment (if paid) → Dashboard
+```
+
+### 3. Dashboard Features
+- **Overview**: Current plan, usage meters, recent pipelines
+- **API Keys**: Generate, manage, and revoke API keys
+- **Billing**: Plan details, usage, invoices, upgrade/downgrade
+- **Settings**: Profile, integrations, notifications
+
+### 4. API Integration
+Users get API key and can integrate using:
+```bash
+curl -X POST https://api.flowforge.dev/v1/pipelines \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "repo_url": "https://github.com/user/repo",
+    "branch": "main",
+    "commands": ["npm install", "npm test", "npm run build"]
+  }'
+```
+
+## DigitalOcean Infrastructure
+
+### Core Services
+- **App Platform**: Host Next.js frontend
+- **Functions**: Serverless API endpoints
+- **Managed PostgreSQL**: Database
+- **Container Registry**: Store pipeline environments
+- **Spaces**: File storage (logs, artifacts)
+- **Load Balancer**: API traffic distribution
+
+### Environment Variables (.env.local)
+```bash
+# Database (DigitalOcean Managed PostgreSQL)
+DATABASE_URL=postgresql://user:pass@host:port/dbname
+POSTGRES_HOST=your-postgres-host
+POSTGRES_PORT=25060
+POSTGRES_DB=flowforge
+POSTGRES_USER=your-postgres-user
+POSTGRES_PASSWORD=your-postgres-password
+
+# Authentication & Security
+JWT_SECRET=your-super-secret-jwt-key-min-32-chars
+API_KEY_SALT=your-api-key-salt-for-hashing
+NEXTAUTH_SECRET=your-nextauth-secret-key
+BCRYPT_ROUNDS=12
+
+# Stripe Payment Integration
+STRIPE_PUBLISHABLE_KEY=pk_test_51...
+STRIPE_SECRET_KEY=sk_test_51...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_SUCCESS_URL=https://app.flowforge.dev/dashboard?payment=success
+STRIPE_CANCEL_URL=https://app.flowforge.dev/pricing?payment=cancel
+
+# DigitalOcean Services
+DO_ACCESS_TOKEN=dop_v1_e38663c2254c7e5b9cb3a695d1403932c149640b31cc93388205a927c1127be1
+DO_SPACES_KEY=your-spaces-access-key
+DO_SPACES_SECRET=your-spaces-secret-key
+DO_SPACES_BUCKET=flowforge-storage
+DO_SPACES_REGION=nyc3
+DO_CONTAINER_REGISTRY=registry.digitalocean.com/flowforge
+
+# App Configuration
+NEXTAUTH_URL=https://app.flowforge.dev
+API_BASE_URL=https://api.flowforge.dev
+FRONTEND_URL=https://app.flowforge.dev
+NODE_ENV=production
+
+# Pipeline Execution
+DOCKER_REGISTRY_URL=registry.digitalocean.com/flowforge
+PIPELINE_TIMEOUT=1800000  # 30 minutes in ms
+MAX_CONCURRENT_PIPELINES=10
+DEFAULT_DOCKER_IMAGE=node:18-alpine
+
+# Email Service (for notifications)
+RESEND_API_KEY=your-resend-api-key
+FROM_EMAIL=noreply@flowforge.dev
+SUPPORT_EMAIL=support@flowforge.dev
+
+# Monitoring & Logging
+SENTRY_DSN=your-sentry-dsn
+LOG_LEVEL=info
+ENABLE_METRICS=true
+
+# GitHub/GitLab Integration (for webhooks)
+GITHUB_CLIENT_ID=your-github-client-id
+GITHUB_CLIENT_SECRET=your-github-client-secret
+GITLAB_CLIENT_ID=your-gitlab-client-id
+GITLAB_CLIENT_SECRET=your-gitlab-client-secret
+BITBUCKET_CLIENT_ID=your-bitbucket-client-id
+BITBUCKET_CLIENT_SECRET=your-bitbucket-client-secret
+
+# Rate Limiting
+REDIS_URL=redis://localhost:6379  # For rate limiting
+RATE_LIMIT_WINDOW=900000  # 15 minutes
+RATE_LIMIT_MAX_REQUESTS=100
+
+# File Upload Limits
+MAX_FILE_SIZE=10485760  # 10MB
+ALLOWED_FILE_TYPES=.zip,.tar,.tar.gz,.dockerfile
+
+# Webhook Security
+WEBHOOK_SECRET=your-webhook-secret-key
+WEBHOOK_TIMEOUT=30000  # 30 seconds
+```
+
+## Pipeline Execution (Simplified)
+
+### Container-based Execution
+```javascript
+// Simplified pipeline execution
+async function executePipeline(pipelineId, repoUrl, branch, commands) {
+  // 1. Create fresh container
+  const container = await createEphemeralContainer();
+  
+  // 2. Clone repository
+  await cloneRepo(container, repoUrl, branch);
+  
+  // 3. Execute commands
+  const logs = await executeCommands(container, commands);
+  
+  // 4. Capture results
+  const artifacts = await captureArtifacts(container);
+  
+  // 5. Cleanup
+  await cleanupContainer(container);
+  
+  // 6. Update pipeline status
+  await updatePipelineStatus(pipelineId, 'completed', logs);
+  
+  return { success: true, logs, artifacts };
+}
+```
+
+## Key Features
+
+### MVP Features
+- ✅ User registration with plan selection
+- ✅ Stripe billing integration
+- ✅ API key management
+- ✅ Usage tracking and limits
+- ✅ Basic pipeline execution
+- ✅ Real-time status updates
+- ✅ Simple dashboard
+
+### Phase 2 Features
+- GitHub/GitLab webhook integration
+- Advanced environment configurations
+- Team collaboration
+- Advanced analytics
+- Custom Docker images
+
+## Implementation Priority
+
+### Week 1: Foundation
+1. Set up Next.js frontend with authentication
+2. Create PostgreSQL database schema
+3. Implement basic user registration/login
+4. Stripe integration for billing
+
+### Week 2: Core API
+1. API key generation and management
+2. Usage tracking system
+3. Basic pipeline execution
+4. Dashboard with usage metrics
+
+### Week 3: Polish & Deploy
+1. API documentation
+2. Error handling and monitoring
+3. Security audit
+4. Production deployment on DigitalOcean
+
+## Complete Implementation Checklist
+
+### 1. Required External Services Setup
+- [ ] DigitalOcean App Platform account
+- [ ] DigitalOcean Managed PostgreSQL database
+- [ ] DigitalOcean Spaces (S3-compatible storage)
+- [ ] DigitalOcean Container Registry
+- [ ] Stripe account with webhook endpoints configured
+- [ ] Domain name with DNS pointing to DigitalOcean
+- [ ] Resend account for transactional emails
+
+### 2. Third-Party API Keys Needed
+- [ ] Stripe API keys (test & production)
+- [ ] DigitalOcean Personal Access Token
+- [ ] Resend API key for emails
+- [ ] GitHub OAuth app (optional for GitHub integration)
+- [ ] GitLab OAuth app (optional for GitLab integration)
+- [ ] Sentry DSN for error tracking
+
+### 3. Missing Components to Add to Prompt
+
+#### A. Authentication Middleware
+```javascript
+// /middleware/auth.js
+export function authenticateAPIKey(req, res, next) {
+  const apiKey = req.headers.authorization?.replace('Bearer ', '');
+  // Validate API key and attach user to request
+}
+
+export function authenticateJWT(req, res, next) {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  // Validate JWT token and attach user to request
+}
+```
+
+#### B. Rate Limiting
+```javascript
+// /middleware/rateLimit.js
+export function createRateLimit(windowMs, max) {
+  // Return rate limiting middleware based on user plan
+}
+```
+
+#### C. Usage Tracking
+```javascript
+// /services/usage.js
+export async function trackUsage(userId, type, amount) {
+  // Track pipeline runs, compute minutes, etc.
+}
+
+export async function checkUsageLimits(userId, plan) {
+  // Check if user is within plan limits
+}
+```
+
+#### D. Docker Pipeline Execution
+```javascript
+// /services/pipeline.js
+export async function executePipeline(pipelineData) {
+  // Create container, clone repo, run commands, cleanup
+}
+```
+
+#### E. Webhook Handlers
+```javascript
+// /api/webhooks/stripe.js - Handle subscription events
+// /api/webhooks/github.js - Handle GitHub push events
+// /api/webhooks/gitlab.js - Handle GitLab push events
+```
+
+### 4. Package.json Dependencies
+```json
+{
+  "dependencies": {
+    "next": "^14.0.0",
+    "react": "^18.0.0",
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0",
+    "tailwindcss": "^3.3.0",
+    "@tailwindcss/forms": "^0.5.0",
+    "shadcn-ui": "latest",
+    "lucide-react": "latest",
+    "next-auth": "^4.24.0",
+    "prisma": "^5.0.0",
+    "@prisma/client": "^5.0.0",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.0",
+    "stripe": "^14.0.0",
+    "axios": "^1.6.0",
+    "zod": "^3.22.0",
+    "react-hook-form": "@7.47.0",
+    "@hookform/resolvers": "^3.3.0",
+    "crypto": "^1.0.1",
+    "uuid": "^9.0.0",
+    "dockerode": "^4.0.0",
+    "ws": "^8.14.0",
+    "express-rate-limit": "^7.1.0",
+    "redis": "^4.6.0",
+    "resend": "^2.0.0",
+    "@sentry/nextjs": "^7.0.0"
+  }
+}
+```
+
+### 5. Database Migrations
+```sql
+-- Add indexes for performance
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_api_keys_user_id ON api_keys(user_id);
+CREATE INDEX idx_api_keys_hash ON api_keys(key_hash);
+CREATE INDEX idx_pipelines_user_id ON pipelines(user_id);
+CREATE INDEX idx_pipelines_status ON pipelines(status);
+CREATE INDEX idx_usage_user_month ON usage(user_id, month);
+```
+
+### 6. Docker Configuration
+```dockerfile
+# /docker/pipeline-base/Dockerfile
+FROM node:18-alpine
+RUN apk add --no-cache git curl
+WORKDIR /workspace
+USER node
+CMD ["sh"]
+```
+
+### 7. DigitalOcean App Spec
+```yaml
+name: flowforge
+services:
+- name: web
+  source_dir: /
+  github:
+    repo: your-username/flowforge
+    branch: main
+  run_command: npm start
+  environment_slug: node-js
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  routes:
+  - path: /
+  envs:
+  - key: DATABASE_URL
+    scope: RUN_AND_BUILD_TIME
+    type: SECRET
+```
