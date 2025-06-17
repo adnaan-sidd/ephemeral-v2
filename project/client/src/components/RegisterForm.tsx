@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { useLocation } from 'wouter';
+import { useNavigate } from 'react-router-dom';
 import { Github, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -15,7 +15,7 @@ export default function RegisterForm({ onClose }: { onClose?: () => void }) {
   });
   
   const { register, loginWithGithub, loading, error } = useAuth();
-  const [, setLocation] = useLocation();
+  const navigate = useNavigate();
   
   const validateForm = () => {
     const errors = {
@@ -57,7 +57,7 @@ export default function RegisterForm({ onClose }: { onClose?: () => void }) {
     
     try {
       await register(name, email, password);
-      setLocation('/dashboard');
+      navigate('/dashboard');
       if (onClose) onClose();
     } catch (error) {
       console.error('Registration failed:', error);
@@ -67,7 +67,7 @@ export default function RegisterForm({ onClose }: { onClose?: () => void }) {
   const handleGithubLogin = async () => {
     try {
       await loginWithGithub();
-      setLocation('/dashboard');
+      navigate('/dashboard');
       if (onClose) onClose();
     } catch (error) {
       console.error('GitHub login failed:', error);

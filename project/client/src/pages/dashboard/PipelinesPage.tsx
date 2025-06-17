@@ -18,10 +18,10 @@ import {
   Trash,
   Settings
 } from 'lucide-react';
-import { useAuth } from '../../../lib/auth';
-import DashboardLayout from '../../components/dashboard/layout/DashboardLayout';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
+import { useAuth } from '@/context/AuthContext';
+import DashboardLayout from '@/components/dashboard/layout/DashboardLayout';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Card,
   CardContent,
@@ -29,7 +29,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle
-} from '../../components/ui/card';
+} from '@/components/ui/card';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,7 +37,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '../../components/ui/dropdown-menu';
+} from '@/components/ui/dropdown-menu';
 import {
   Table,
   TableBody,
@@ -45,12 +45,12 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "../../components/ui/table";
-import { Badge } from '../../components/ui/badge';
-import { useWebSocket } from '../../components/dashboard/layout/DashboardLayout';
+} from "@/components/ui/table";
+import { Badge } from '@/components/ui/badge';
+import { useWebSocket } from '@/context/WebSocketContext';
 import { formatDistanceToNow } from 'date-fns';
-import { Progress } from '../../components/ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 // Sample pipelines data
 const samplePipelines = [

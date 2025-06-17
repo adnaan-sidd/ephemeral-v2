@@ -1,180 +1,93 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation } from 'wouter';
-import { Filter, RefreshCw } from 'lucide-react';
-import { useAuth } from '../../../lib/auth';
-import DashboardLayout from '../../components/dashboard/layout/DashboardLayout';
-import BuildsTable from '../../components/dashboard/builds/BuildsTable';
-import RealtimeBuildUpdater from '../../components/dashboard/builds/RealtimeBuildUpdater';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '../../components/ui/dropdown-menu';
-import { useWebSocket } from '../../components/dashboard/layout/DashboardLayout';
-
-// Sample builds data (same as in DashboardPage)
-const sampleBuilds = [
-  {
-    id: '1',
-    projectId: '1',
-    projectName: 'Frontend App',
-    status: 'success',
-    branch: 'main',
-    commitSha: 'a1b2c3d4e5f6g7h8i9j0',
-    commitMessage: 'Update header component with new design',
-    author: 'Sarah Chen',
-    duration: 145000, // 2m 25s
-    startedAt: new Date(Date.now() - 3600000), // 1 hour ago
-    finishedAt: new Date(Date.now() - 3455000) // 57.5 minutes ago
-  },
-  {
-    id: '2',
-    projectId: '2',
-    projectName: 'API Service',
-    status: 'running',
-    branch: 'feature/auth-improvements',
-    commitSha: 'b2c3d4e5f6g7h8i9j0k1',
-    commitMessage: 'Implement OAuth2 flow',
-    author: 'John Doe',
-    duration: 60000, // 1m (running)
-    startedAt: new Date(Date.now() - 60000), // 1 minute ago
-    finishedAt: null
-  },
-  {
-    id: '3',
-    projectId: '1',
-    projectName: 'Frontend App',
-    status: 'failed',
-    branch: 'bugfix/mobile-layout',
-    commitSha: 'c3d4e5f6g7h8i9j0k1l2',
-    commitMessage: 'Fix responsive layout on small screens',
-    author: 'Sarah Chen',
-    duration: 74000, // 1m 14s
-    startedAt: new Date(Date.now() - 900000), // 15 minutes ago
-    finishedAt: new Date(Date.now() - 826000) // 13.8 minutes ago
-  },
-  {
-    id: '4',
-    projectId: '3',
-    projectName: 'Backend Service',
-    status: 'queued',
-    branch: 'main',
-    commitSha: 'd4e5f6g7h8i9j0k1l2m3',
-    commitMessage: 'Update dependencies',
-    author: 'Mike Johnson',
-    duration: 0,
-    startedAt: new Date(Date.now() - 120000), // 2 minutes ago
-    finishedAt: null
-  },
-  {
-    id: '5',
-    projectId: '2',
-    projectName: 'API Service',
-    status: 'success',
-    branch: 'main',
-    commitSha: 'e5f6g7h8i9j0k1l2m3n4',
-    commitMessage: 'Add rate limiting to public endpoints',
-    author: 'John Doe',
-    duration: 187000, // 3m 7s
-    startedAt: new Date(Date.now() - 7200000), // 2 hours ago
-    finishedAt: new Date(Date.now() - 7013000) // 1 hour 57 minutes ago
-  },
-  {
-    id: '6',
-    projectId: '1',
-    projectName: 'Frontend App',
-    status: 'success',
-    branch: 'feature/dark-mode',
-    commitSha: 'f6g7h8i9j0k1l2m3n4o5',
-    commitMessage: 'Implement dark mode toggle',
-    author: 'Sarah Chen',
-    duration: 112000, // 1m 52s
-    startedAt: new Date(Date.now() - 86400000), // 1 day ago
-    finishedAt: new Date(Date.now() - 86288000) // 23 hours 58 minutes ago
-  },
-  {
-    id: '7',
-    projectId: '3',
-    projectName: 'Backend Service',
-    status: 'canceled',
-    branch: 'feature/caching',
-    commitSha: 'g7h8i9j0k1l2m3n4o5p6',
-    commitMessage: 'Add Redis caching layer',
-    author: 'Mike Johnson',
-    duration: 32000, // 32s
-    startedAt: new Date(Date.now() - 43200000), // 12 hours ago
-    finishedAt: new Date(Date.now() - 43168000) // 11 hours 59 minutes ago
-  },
-  {
-    id: '8',
-    projectId: '4',
-    projectName: 'Data Processor',
-    status: 'success',
-    branch: 'develop',
-    commitSha: 'h8i9j0k1l2m3n4o5p6q7',
-    commitMessage: 'Optimize batch processing algorithm',
-    author: 'Alex Williams',
-    duration: 295000, // 4m 55s
-    startedAt: new Date(Date.now() - 172800000), // 2 days ago
-    finishedAt: new Date(Date.now() - 172505000) // 1 day 23 hours 55 minutes ago
-  }
-];
+import { Filter, RefreshCw, Search } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import DashboardLayout from '@/components/dashboard/layout/DashboardLayout';
+import BuildsTable from '@/components/dashboard/builds/BuildsTable';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 
 export default function BuildsPage() {
-  const [, setLocation] = useLocation();
   const { user, token } = useAuth();
-  const { socket } = useWebSocket();
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [, setLocation] = useLocation();
   const [statusFilter, setStatusFilter] = useState('all');
-  const [projectFilter, setProjectFilter] = useState('all');
-  const [searchTerm, setSearchTerm] = useState('');
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (!user || !token) {
-      setLocation('/');
-    }
-  }, [user, token, setLocation]);
-  }, [socket]);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Fetch builds
-  const { data: builds = [], isLoading, refetch } = useQuery({
+  // Sample builds data - replace with real API call
+  const sampleBuilds = [
+    {
+      id: '1',
+      projectId: '1',
+      projectName: 'my-awesome-app',
+      status: 'success' as const,
+      branch: 'main',
+      commitSha: 'abc123ef',
+      commitMessage: 'Add new feature',
+      author: 'john@example.com',
+      duration: 120000,
+      startedAt: new Date(Date.now() - 3600000),
+      finishedAt: new Date(Date.now() - 3480000),
+    },
+    {
+      id: '2',
+      projectId: '1',
+      projectName: 'my-awesome-app',
+      status: 'failed' as const,
+      branch: 'feature/auth',
+      commitSha: 'def456gh',
+      commitMessage: 'Fix authentication bug',
+      author: 'jane@example.com',
+      duration: 45000,
+      startedAt: new Date(Date.now() - 7200000),
+      finishedAt: new Date(Date.now() - 7155000),
+    },
+    {
+      id: '3',
+      projectId: '2',
+      projectName: 'api-service',
+      status: 'running' as const,
+      branch: 'main',
+      commitSha: 'ghi789jk',
+      commitMessage: 'Update dependencies',
+      author: 'bob@example.com',
+      duration: 0,
+      startedAt: new Date(Date.now() - 300000),
+      finishedAt: null,
+    }
+  ];
+
+  const { data: builds = sampleBuilds, isLoading } = useQuery({
     queryKey: ['/api/builds'],
     queryFn: async () => {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return sampleBuilds;
+      const response = await fetch('/api/builds', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error('Failed to fetch builds');
+      return response.json();
     },
     enabled: !!token
   });
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await refetch();
-    setIsRefreshing(false);
-  };
-
-  // Get unique projects for filtering
-  const projects = [...new Set(builds.map(build => build.projectName))];
-
-  // Filter builds based on filters and search
   const filteredBuilds = builds.filter(build => {
     const matchesStatus = statusFilter === 'all' || build.status === statusFilter;
-    const matchesProject = projectFilter === 'all' || build.projectName === projectFilter;
-    const matchesSearch = 
-      build.commitMessage.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      build.author.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      build.branch.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      build.commitSha.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = !searchQuery || 
+      build.projectName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      build.commitMessage.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      build.author.toLowerCase().includes(searchQuery.toLowerCase());
     
-    return matchesStatus && matchesProject && matchesSearch;
+    return matchesStatus && matchesSearch;
   });
+
+  const statusCounts = {
+    all: builds.length,
+    success: builds.filter(b => b.status === 'success').length,
+    failed: builds.filter(b => b.status === 'failed').length,
+    running: builds.filter(b => b.status === 'running').length,
+    queued: builds.filter(b => b.status === 'queued').length,
+  };
 
   if (!user) {
     return null;
@@ -182,106 +95,86 @@ export default function BuildsPage() {
 
   return (
     <DashboardLayout>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
-          Builds
-        </h1>
-        <p className="text-slate-600 dark:text-slate-400 mt-1">
-          View and manage all builds across your projects
-        </p>
-      </div>
+      <div className="space-y-6">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col space-y-2"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">Builds</h1>
+              <p className="text-slate-600 dark:text-slate-400">
+                View and manage all builds across your projects.
+              </p>
+            </div>
+            <Button variant="outline" className="flex items-center gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Refresh
+            </Button>
+          </div>
+        </motion.div>
 
-      {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="w-full md:w-1/3">
-          <Input 
-            placeholder="Search builds..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        
-        <div className="flex flex-1 items-center space-x-4">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline">
-                <Filter className="h-4 w-4 mr-2" />
-                Status: {statusFilter === 'all' ? 'All' : statusFilter}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuLabel>Filter by Status</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => setStatusFilter('all')}>
-                All
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setStatusFilter('success')}>
-                Success
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setStatusFilter('running')}>
-                Running
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setStatusFilter('failed')}>
-                Failed
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setStatusFilter('queued')}>
-                Queued
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setStatusFilter('canceled')}>
-                Canceled
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline">
-                <Filter className="h-4 w-4 mr-2" />
-                Project: {projectFilter === 'all' ? 'All' : projectFilter}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuLabel>Filter by Project</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => setProjectFilter('all')}>
-                All
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              {projects.map(project => (
-                <DropdownMenuItem key={project} onClick={() => setProjectFilter(project)}>
-                  {project}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          
-          <Button 
-            variant="outline" 
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Refresh
+        {/* Status Filters */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="flex flex-wrap gap-2"
+        >
+          {Object.entries(statusCounts).map(([status, count]) => (
+            <Button
+              key={status}
+              variant={statusFilter === status ? "default" : "outline"}
+              onClick={() => setStatusFilter(status)}
+              className="flex items-center gap-2"
+            >
+              {status.charAt(0).toUpperCase() + status.slice(1)}
+              <Badge variant="secondary" className="text-xs">
+                {count}
+              </Badge>
+            </Button>
+          ))}
+        </motion.div>
+
+        {/* Search */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="flex flex-col md:flex-row gap-4"
+        >
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
+            <Input
+              placeholder="Search builds..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Button variant="outline" className="flex items-center gap-2">
+            <Filter className="h-4 w-4" />
+            Advanced Filters
           </Button>
-        </div>
-      </div>
+        </motion.div>
 
-      {/* Builds Table */}
-      <BuildsTable 
-        builds={filteredBuilds} 
-        isLoading={isLoading || isRefreshing} 
-        onRefresh={handleRefresh}
-        showFilters={false}
-        onBuildClick={(buildId) => setLocation(`/dashboard/builds/${buildId}`)}
-      />
+        {/* Builds Table */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <BuildsTable 
+            builds={filteredBuilds} 
+            isLoading={isLoading} 
+            onRefresh={() => {}}
+            showFilters={false}
+            onBuildClick={(buildId) => setLocation(`/dashboard/builds/${buildId}`)}
+          />
+        </motion.div>
+      </div>
     </DashboardLayout>
   );
 }
-      {/* Builds Table */}
-      <RealtimeBuildUpdater projectId={projectFilter === 'all' ? undefined : projects.find(p => p === projectFilter)?.id}>
-        <BuildsTable 
-          builds={filteredBuilds} 
-          isLoading={isLoading || isRefreshing} 
-          onRefresh={handleRefresh}
-          showFilters={false}
-          onBuildClick={(buildId) => setLocation(`/dashboard/builds/${buildId}`)}
-        />
-      </RealtimeBuildUpdater>

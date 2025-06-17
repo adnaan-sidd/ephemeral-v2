@@ -17,10 +17,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-50">
+    <div className="flex h-screen bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-50">
       <Sidebar open={sidebarOpen} toggleSidebar={toggleSidebar} />
 
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div 
+        className="flex-1 flex flex-col overflow-hidden transition-all duration-300"
+        style={{ marginLeft: sidebarOpen ? '240px' : '80px' }}
+      >
         <Header 
           sidebarOpen={sidebarOpen} 
           toggleSidebar={toggleSidebar} 

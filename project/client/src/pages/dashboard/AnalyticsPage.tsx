@@ -11,9 +11,9 @@ import {
   Download,
   RefreshCw
 } from 'lucide-react';
-import { useAuth } from '../../../lib/auth';
-import DashboardLayout from '../../components/dashboard/layout/DashboardLayout';
-import { Button } from '../../components/ui/button';
+import { useAuth } from '@/context/AuthContext';
+import DashboardLayout from '@/components/dashboard/layout/DashboardLayout';
+import { Button } from '@/components/ui/button';
 import { 
   Card, 
   CardContent, 
@@ -21,7 +21,7 @@ import {
   CardFooter, 
   CardHeader, 
   CardTitle 
-} from '../../components/ui/card';
+} from '@/components/ui/card';
 import {
   LineChart,
   Line,
@@ -40,14 +40,14 @@ import {
   ResponsiveContainer
 } from 'recharts';
 import { format, subDays, parseISO } from 'date-fns';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../../components/ui/select";
+} from "@/components/ui/select";
 
 // Generate sample data for charts
 const generateDailyBuildData = (days = 30) => {

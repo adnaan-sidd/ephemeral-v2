@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useLocation } from 'wouter';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   BarChart, 
@@ -28,7 +28,8 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ open, toggleSidebar }: SidebarProps) {
-  const [location, setLocation] = useLocation();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useAuth();
   const { theme } = useTheme();
   
@@ -37,55 +38,61 @@ export default function Sidebar({ open, toggleSidebar }: SidebarProps) {
       name: 'Dashboard', 
       icon: <Gauge size={20} />, 
       path: '/dashboard',
-      active: location === '/dashboard'
+      active: location.pathname === '/dashboard'
     },
     { 
       name: 'Projects', 
       icon: <Package size={20} />, 
       path: '/dashboard/projects',
-      active: location.startsWith('/dashboard/projects')
+      active: location.pathname.startsWith('/dashboard/projects')
     },
     { 
       name: 'Builds', 
       icon: <Zap size={20} />, 
       path: '/dashboard/builds',
-      active: location.startsWith('/dashboard/builds')
+      active: location.pathname.startsWith('/dashboard/builds')
     },
     { 
       name: 'Pipelines', 
       icon: <Code size={20} />, 
       path: '/dashboard/pipelines',
-      active: location.startsWith('/dashboard/pipelines')
+      active: location.pathname.startsWith('/dashboard/pipelines')
     },
     { 
       name: 'Analytics', 
       icon: <BarChart size={20} />, 
       path: '/dashboard/analytics',
-      active: location.startsWith('/dashboard/analytics')
+      active: location.pathname.startsWith('/dashboard/analytics')
     },
     { 
       name: 'Billing', 
       icon: <CreditCard size={20} />, 
       path: '/dashboard/billing',
-      active: location.startsWith('/dashboard/billing')
+      active: location.pathname.startsWith('/dashboard/billing')
     },
     { 
       name: 'Notifications', 
       icon: <Bell size={20} />, 
       path: '/dashboard/notifications',
-      active: location.startsWith('/dashboard/notifications')
+      active: location.pathname.startsWith('/dashboard/notifications')
+    },
+    { 
+      name: 'Profile', 
+      icon: <User size={20} />, 
+      path: '/dashboard/profile',
+      active: location.pathname.startsWith('/dashboard/profile')
     },
     { 
       name: 'Settings', 
       icon: <Settings size={20} />, 
       path: '/dashboard/settings',
-      active: location.startsWith('/dashboard/settings')
+      active: location.pathname.startsWith('/dashboard/settings')
     },
   ];
 
   const handleLogout = () => {
     logout();
-    setLocation('/');
+    navigate('/');
   };
   
   return (
@@ -128,7 +135,7 @@ export default function Sidebar({ open, toggleSidebar }: SidebarProps) {
         <Button 
           className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white" 
           size={open ? "default" : "icon"}
-          onClick={() => setLocation('/dashboard/projects/new')}
+          onClick={() => navigate('/dashboard/projects')}
         >
           <Plus size={16} />
           {open && <span>New Project</span>}
@@ -144,7 +151,7 @@ export default function Sidebar({ open, toggleSidebar }: SidebarProps) {
                 href={item.path}
                 onClick={(e) => {
                   e.preventDefault();
-                  setLocation(item.path);
+                  navigate(item.path);
                 }}
                 className={cn(
                   "flex items-center py-2 px-3 rounded-lg transition-colors",

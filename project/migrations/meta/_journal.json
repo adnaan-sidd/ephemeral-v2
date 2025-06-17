@@ -8,6 +8,20 @@
       "when": 1749681006310,
       "tag": "0000_condemned_vision",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1750003174328,
+      "tag": "0001_github_auth",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1750003285008,
+      "tag": "0002_add_github_tables",
+      "breakpoints": true
     }
   ]
 }

@@ -1,23 +1,27 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { getUserData } from '../utils/api';
-import { useAuth as useZustandAuth } from '../lib/auth';
 
 interface User {
   id: string;
-  name: string;
   email: string;
-  avatar?: string;
+  plan: string;
+  company?: string;
+  githubUsername?: string;
+  githubId?: string;
+  avatarUrl?: string;
+  name?: string;
 }
 
 interface AuthContextType {
   isAuthenticated: boolean;
   user: User | null;
+  token: string | null;
   loading: boolean;
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
-  loginWithGithub: () => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
+  loginWithGithub: () => Promise<void>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,41 +31,87 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const zustandAuth = useZustandAuth();
   const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Check if user is already logged in
+  // Check if user is already logged in on page load
   useEffect(() => {
     const checkAuthStatus = async () => {
       try {
-        const userData = await getUserData();
-        setUser(userData);
-      } catch (error) {
-        console.error('Failed to get user data:', error);
+        setLoading(true);
+        const storedToken = localStorage.getItem('auth_token');
+        if (!storedToken) {
+          setLoading(false);
+          return;
+        }
+
+        setToken(storedToken);
+        console.log('✅ Found token in localStorage, verifying with backend...');
+        
+        try {
+          const response = await fetch('/api/auth/me', {
+            headers: {
+              'Authorization': `Bearer ${storedToken}`,
+            },
+          });
+
+          if (response.ok) {
+            const userData = await response.json();
+            console.log('✅ Successfully verified token and retrieved user data');
+            setUser(userData);
+          } else {
+            console.error('❌ Invalid token, removing from localStorage');
+            // Invalid token, remove it
+            localStorage.removeItem('auth_token');
+            setToken(null);
+          }
+        } catch (error) {
+          console.error('❌ Error checking authentication status:', error);
+          localStorage.removeItem('auth_token');
+          setToken(null);
+        }
       } finally {
         setLoading(false);
       }
     };
 
     checkAuthStatus();
-  }, [zustandAuth.user]);
+  }, []);
 
-  const login = async (email: string, password: string) => {
-    setLoading(true);
-    setError(null);
-    
+  const refreshUser = async () => {
+    const storedToken = localStorage.getItem('auth_token');
+    if (!storedToken) {
+      console.log('❌ No token found in localStorage during refreshUser');
+      return;
+    }
+
     try {
-      await zustandAuth.login(email, password);
-      const userData = await getUserData();
-      setUser(userData);
-    } catch (error: any) {
-      console.error('Login failed:', error);
-      setError(error.message || 'Login failed. Please try again.');
-      throw error;
-    } finally {
-      setLoading(false);
+      console.log('🔄 Refreshing user data...');
+      const response = await fetch('/api/auth/me', {
+        headers: {
+          'Authorization': `Bearer ${storedToken}`,
+        },
+      });
+
+      if (response.ok) {
+        const userData = await response.json();
+        console.log('✅ Successfully refreshed user data:', userData.email);
+        setUser(userData);
+        setToken(storedToken);
+      } else {
+        console.error('❌ Failed to refresh user, status:', response.status);
+        // Invalid token, remove it
+        localStorage.removeItem('auth_token');
+        setUser(null);
+        setToken(null);
+      }
+    } catch (error) {
+      console.error('❌ Error refreshing user:', error);
+      localStorage.removeItem('auth_token');
+      setUser(null);
+      setToken(null);
     }
   };
 
@@ -70,15 +120,88 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setError(null);
     
     try {
-      // Here we would integrate with our GitHub authentication component
-      // For now, we'll just simulate a successful login
-      await zustandAuth.login('github-user@example.com', 'github-auth');
-      const userData = await getUserData();
-      setUser(userData);
+      // Clear any existing tokens to prevent issues
+      localStorage.removeItem('auth_token');
+      
+      // Get GitHub OAuth URL from backend
+      console.log('🔄 Requesting GitHub OAuth URL from backend...');
+      const response = await fetch('/api/auth/github', {
+        headers: { 'Cache-Control': 'no-cache' }
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText };
+        }
+        console.error('❌ Failed to get GitHub auth URL:', errorData);
+        throw new Error(errorData.error || 'Failed to initiate GitHub login');
+      }
+      
+      const data = await response.json();
+      
+      if (data.authUrl) {
+        console.log('✅ Received GitHub OAuth URL, redirecting...', 
+          data.authUrl.substring(0, 60) + '...');
+        
+        // Store a timestamp to detect if the flow gets stuck
+        localStorage.setItem('github_auth_started', Date.now().toString());
+        
+        // Redirect to GitHub OAuth
+        window.location.href = data.authUrl;
+      } else {
+        console.error('❌ No authUrl in response:', data);
+        throw new Error('Failed to initiate GitHub login: No authentication URL provided');
+      }
     } catch (error: any) {
-      console.error('GitHub login failed:', error);
+      console.error('❌ GitHub login failed:', error);
       setError(error.message || 'GitHub login failed. Please try again.');
-      throw error;
+      setLoading(false);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      // Call backend logout endpoint
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (error) {
+      console.error('Logout request failed:', error);
+    } finally {
+      // Always clear local state and token
+      localStorage.removeItem('auth_token');
+      setUser(null);
+      setToken(null);
+    }
+  };
+
+  const login = async (email: string, password: string) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Login failed');
+      }
+      
+      localStorage.setItem('auth_token', data.token);
+      setToken(data.token);
+      setUser(data.user);
+    } catch (error: any) {
+      console.error('Login failed:', error);
+      setError(error.message || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -89,21 +212,29 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setError(null);
     
     try {
-      await zustandAuth.register(email, password, 'free');
-      const userData = await getUserData();
-      setUser(userData);
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name, email, password }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.message || 'Registration failed');
+      }
+      
+      localStorage.setItem('auth_token', data.token);
+      setToken(data.token);
+      setUser(data.user);
     } catch (error: any) {
       console.error('Registration failed:', error);
       setError(error.message || 'Registration failed. Please try again.');
-      throw error;
     } finally {
       setLoading(false);
     }
-  };
-
-  const logout = () => {
-    zustandAuth.logout();
-    setUser(null);
   };
 
   return (
@@ -111,12 +242,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
       value={{
         isAuthenticated: !!user,
         user,
+        token,
         loading,
         error,
         login,
-        loginWithGithub,
         register,
-        logout
+        loginWithGithub,
+        logout,
+        refreshUser,
       }}
     >
       {children}

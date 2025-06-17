@@ -1,10 +1,10 @@
 import { motion } from 'framer-motion';
 import { useLocation } from 'wouter';
-import { GitBranch, Clock, Play, Settings, ArrowUpRight, GitHub, GitLab, Gitlab } from 'lucide-react';
-import { Card, CardContent, CardFooter } from '../../ui/card';
-import { Button } from '../../ui/button';
-import { cn } from '../../../lib/utils';
-import { Badge } from '../../ui/badge';
+import { GitBranch, Clock, Play, Settings, ArrowUpRight, Github, Gitlab } from 'lucide-react';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
 import { formatDistanceToNow } from 'date-fns';
 
 interface Project {
@@ -41,9 +41,9 @@ export default function ProjectCard({ project, onBuildNow, isLoading = false }: 
   const getProviderIcon = () => {
     switch (project.repository.provider) {
       case 'github':
-        return <GitHub size={16} />;
+        return <Github size={16} />;
       case 'gitlab':
-        return <GitLab size={16} />;
+        return <Gitlab size={16} />;
       case 'bitbucket':
         return (
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

@@ -34,6 +34,11 @@ export default function LandingPage() {
     setAuthMode('register');
     setShowAuthModal(true);
   };
+  
+  const handleSignIn = () => {
+    setAuthMode('login');
+    setShowAuthModal(true);
+  };
 
   const handleSelectPlan = (plan: string) => {
     setAuthMode('register');

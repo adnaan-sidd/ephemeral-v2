@@ -3,6 +3,11 @@ import { motion } from 'framer-motion';
 import { Check } from 'lucide-react';
 import { useLocation } from 'wouter';
 
+// Define a props interface to receive the auth modal control functions
+interface PricingSectionProps {
+  openAuthModal?: (mode: 'login' | 'register') => void;
+}
+
 const pricingTiers = [
   {
     name: "Starter",
@@ -79,7 +84,7 @@ const pricingTiers = [
   }
 ];
 
-export default function PricingSection() {
+export default function PricingSection({ openAuthModal }: PricingSectionProps = {}) {
   const [annual, setAnnual] = useState(false);
   const [, setLocation] = useLocation();
   
@@ -190,10 +195,17 @@ export default function PricingSection() {
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={() => tier.cta === "Contact Sales" 
-                    ? window.location.href = "mailto:sales@flowforge.dev" 
-                    : setLocation('/register')
-                  }
+                  onClick={() => {
+                    if (tier.cta === "Contact Sales") {
+                      window.location.href = "mailto:sales@flowforge.dev";
+                    } else {
+                      if (openAuthModal) {
+                        openAuthModal('register');
+                      } else {
+                        setLocation('/register');
+                      }
+                    }
+                  }}
                   className={`w-full py-2 px-4 rounded-lg font-medium transition-colors ${
                     tier.highlighted
                     ? 'bg-gradient-to-r from-blue-600 to-violet-600 text-white hover:from-blue-700 hover:to-violet-700'

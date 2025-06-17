@@ -1,11 +1,33 @@
-import 'dotenv/config'; // Load environment variables first
+import * as dotenv from 'dotenv';
+dotenv.config(); // Load environment variables first
+
+// Verify env variables are loaded
+console.log('Environment variables loaded:');
+console.log('- GitHub Client ID:', process.env.GITHUB_CLIENT_ID ? 'Set' : 'Missing');
+console.log('- GitHub Client Secret:', process.env.GITHUB_CLIENT_SECRET ? 'Set' : 'Missing');
+console.log('- JWT Secret:', process.env.JWT_SECRET ? 'Set' : 'Missing');
+console.log('- Session Secret:', process.env.SESSION_SECRET ? 'Set' : 'Missing');
+
 import express, { type Request, Response, NextFunction } from "express";
+import session from "express-session";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Session middleware for OAuth state management
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your-session-secret-key-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { 
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    maxAge: 1000 * 60 * 15 // 15 minutes
+  }
+}));
 
 app.use((req, res, next) => {
   const start = Date.now();

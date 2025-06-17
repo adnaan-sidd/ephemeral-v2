@@ -1,80 +1,65 @@
-import { Switch, Route, useLocation } from "wouter";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "next-themes";
-import { useState, useEffect } from "react";
 import HomePage from "./pages/HomePage";
 import Dashboard from "@/pages/dashboard";
 import Documentation from "@/pages/docs";
 import Checkout from "@/pages/checkout";
 import NotFound from "@/pages/not-found";
-import { AuthProvider } from "@/context/AuthContext";
+import GitHubCallback from "@/components/GitHubCallback";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { WebSocketProvider } from "@/context/WebSocketContext";
 import NotificationListener from "@/components/dashboard/notifications/NotificationListener";
-import LoginForm from "@/components/LoginForm";
-import RegisterForm from "@/components/RegisterForm";
 
-function Router() {
+// Protected route component
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, loading } = useAuth();
+  
+  // Show loading indicator while checking auth status
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+    </div>;
+  }
+  
+  // Redirect to home if not authenticated
+  if (!isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
+  
+  return <>{children}</>;
+}
+
+function AppRoutes() {
   return (
-    <Switch>
-      <Route path="/" component={HomePage} />
-      <Route path="/dashboard" component={Dashboard} />
-      <Route path="/docs" component={Documentation} />
-      <Route path="/checkout" component={Checkout} />
-      <Route path="/login" component={() => {
-        const [, navigate] = useLocation();
-        const [showAuthModal, setShowAuthModal] = useState(true);
-        
-        useEffect(() => {
-          if (!showAuthModal) {
-            navigate('/');
-          }
-        }, [showAuthModal, navigate]);
-        
-        return (
-          <>
-            <HomePage />
-            {showAuthModal && (
-              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-md">
-                  <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Sign In</h2>
-                  <LoginForm onClose={() => setShowAuthModal(false)} />
-                </div>
-              </div>
-            )}
-          </>
-        );
-      }} />
-      <Route path="/register" component={() => {
-        const [, navigate] = useLocation();
-        const [showAuthModal, setShowAuthModal] = useState(true);
-        
-        useEffect(() => {
-          if (!showAuthModal) {
-            navigate('/');
-          }
-        }, [showAuthModal, navigate]);
-        
-        return (
-          <>
-            <HomePage />
-            {showAuthModal && (
-              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-md">
-                  <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Create Account</h2>
-                  <RegisterForm onClose={() => setShowAuthModal(false)} />
-                </div>
-              </div>
-            )}
-          </>
-        );
-      }} />
-      <Route component={NotFound} />
-    </Switch>
+    <Routes>
+      <Route path="/" element={<HomePage />} />
+      <Route path="/auth/github/callback" element={<GitHubCallback />} />
+      <Route 
+        path="/dashboard/*" 
+        element={
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        } 
+      />
+      <Route path="/docs" element={<Documentation />} />
+      <Route 
+        path="/checkout" 
+        element={
+          <ProtectedRoute>
+            <Checkout />
+          </ProtectedRoute>
+        } 
+      />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
   );
 }
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -82,17 +67,18 @@ function App() {
         <AuthProvider>
           <WebSocketProvider>
             <TooltipProvider>
-              <Toaster />
-              <NotificationListener>
-                <Router />
-              </NotificationListener>
+              <Router>
+                <Toaster />
+                <NotificationListener>
+                  <AppRoutes />
+                </NotificationListener>
+              </Router>
             </TooltipProvider>
           </WebSocketProvider>
         </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );
-} );
 }
 
 export default App;

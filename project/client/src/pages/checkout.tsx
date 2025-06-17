@@ -66,13 +66,18 @@ export default function Checkout() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create checkout session');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create checkout session');
       }
 
       const data = await response.json();
       
-      // Redirect to Stripe checkout
-      window.location.href = data.url;
+      // Redirect to Razorpay checkout (placeholder for now)
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error('Invalid checkout session response');
+      }
     } catch (error: any) {
       setPaymentStatus('error');
       toast({
@@ -237,7 +242,7 @@ export default function Checkout() {
                   <div>
                     <h3 className="font-semibold text-slate-900 mb-2">What's included in all paid plans:</h3>
                     <ul className="text-sm text-slate-600 space-y-1">
-                      <li>• Secure payment processing via Stripe</li>
+                      <li>• Secure payment processing via Razorpay</li>
                       <li>• 30-day money-back guarantee</li>
                       <li>• Cancel anytime - no long-term commitments</li>
                       <li>• Automatic scaling as your team grows</li>

@@ -3,7 +3,12 @@ import { ArrowRight } from 'lucide-react';
 import { flowForgeImages } from '../../utils/images';
 import { useLocation } from 'wouter';
 
-export default function CTASection() {
+// Define a props interface to receive the auth modal control functions
+interface CTASectionProps {
+  openAuthModal?: (mode: 'login' | 'register') => void;
+}
+
+export default function CTASection({ openAuthModal }: CTASectionProps = {}) {
   const [, setLocation] = useLocation();
 
   return (
@@ -36,7 +41,7 @@ export default function CTASection() {
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => setLocation('/register')}
+            onClick={() => openAuthModal ? openAuthModal('register') : setLocation('/register')}
             className="px-8 py-4 bg-white text-blue-900 font-medium rounded-lg shadow-lg hover:shadow-xl transition-all flex items-center justify-center mx-auto"
           >
             Start Free Trial

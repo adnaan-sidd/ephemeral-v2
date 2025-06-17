@@ -18,8 +18,9 @@ import {
   Code,
   User
 } from 'lucide-react';
+import Breadcrumb from './Breadcrumb';
 import NotificationsCenter from '@/components/dashboard/notifications/NotificationsCenter';
-import { useAuth } from '@/lib/auth';
+import { useAuth } from '@/context/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,28 +35,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 
-// Helper to create breadcrumb from location
-const getBreadcrumb = (location: string) => {
-  const parts = location.split('/').filter(Boolean);
-  
-  // If we're at the root dashboard
-  if (parts.length === 1 && parts[0] === 'dashboard') {
-    return [{ label: 'Dashboard', path: '/dashboard' }];
-  }
-  
-  return parts.map((part, index) => {
-    // Replace IDs with more descriptive labels (this would be improved with actual data)
-    const label = part.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)
-      ? 'Detail'
-      : part.charAt(0).toUpperCase() + part.slice(1);
-    
-    // Create the path up to this point
-    const path = '/' + parts.slice(0, index + 1).join('/');
-    
-    return { label, path };
-  });
-};
-
 interface HeaderProps {
   sidebarOpen: boolean;
   toggleSidebar: () => void;
@@ -64,13 +43,11 @@ interface HeaderProps {
 
 export default function Header({ sidebarOpen, toggleSidebar, isConnected }: HeaderProps) {
   const [location, setLocation] = useLocation();
+  const { user, logout } = useAuth();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [unreadNotifications, setUnreadNotifications] = useState(3);
-  
-  // Breadcrumb for navigation
-  const breadcrumb = getBreadcrumb(location);
   
   // After mounting, we can safely show the theme toggle
   useEffect(() => {
@@ -89,158 +66,152 @@ export default function Header({ sidebarOpen, toggleSidebar, isConnected }: Head
   };
   
   return (
-    <header className="fixed top-0 right-0 z-20 w-full bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 h-16">
+    <header 
+      className="fixed top-0 z-20 h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 transition-all duration-300"
+      style={{ 
+        left: sidebarOpen ? '240px' : '80px',
+        right: '0'
+      }}
+    >
       <div className="flex h-full items-center justify-between px-4">
         {/* Left side - Mobile menu button and breadcrumbs */}
-        <div className="flex items-center">
+        <div className="flex items-center space-x-4">
           <button
             onClick={toggleSidebar}
-            className="md:hidden mr-2 p-2 rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+            className="md:hidden p-2 rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
           >
             <Menu size={20} />
           </button>
           
-          {/* Breadcrumb navigation */}
-          <nav className="hidden md:flex items-center space-x-1 text-sm">
-            {breadcrumb.map((item, index) => (
-              <div key={item.path} className="flex items-center">
-                {index > 0 && (
-                  <span className="mx-2 text-slate-400 dark:text-slate-600">/</span>
-                )}
-                <a
-                  href={item.path}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setLocation(item.path);
-                  }}
-                  className={cn(
-                    "font-medium hover:text-blue-600 dark:hover:text-blue-400 transition-colors",
-                    index === breadcrumb.length - 1
-                      ? "text-blue-600 dark:text-blue-400"
-                      : "text-slate-600 dark:text-slate-400"
-                  )}
-                >
-                  {item.label}
-                </a>
-              </div>
-            ))}
-          </nav>
+          {/* Breadcrumb Navigation */}
+          <div className="hidden md:block">
+            <Breadcrumb />
+          </div>
         </div>
-        
+
         {/* Center - Search Bar (only on larger screens) */}
-        <form 
-          onSubmit={handleSearch}
-          className="hidden md:flex flex-1 max-w-md mx-8"
-        >
-          <div className="relative w-full">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 dark:text-slate-500" size={16} />
+        <div className="hidden lg:flex flex-1 max-w-md mx-8">
+          <form onSubmit={handleSearch} className="w-full relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
             <Input
-              type="search"
-              placeholder="Search builds, projects, pipelines..."
-              className="w-full pl-10 bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600"
+              type="text"
+              placeholder="Search projects, builds..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 bg-slate-50 dark:bg-slate-700 border-slate-200 dark:border-slate-600 focus:border-blue-500 dark:focus:border-blue-400"
             />
-          </div>
-        </form>
-        
-        {/* Right side - Actions and Profile */}
-        <div className="flex items-center space-x-1 md:space-x-3">
-          {/* Connection status indicator */}
-          <div className="hidden md:flex items-center">
+          </form>
+        </div>
+
+        {/* Right side - Actions and user menu */}
+        <div className="flex items-center space-x-2">
+          {/* Connection Status */}
+          <div className="hidden md:flex items-center space-x-2">
             <div className={cn(
-              "w-2 h-2 rounded-full mr-2",
-              isConnected ? "bg-green-500" : "bg-red-500"
-            )}></div>
-            <span className="text-xs text-slate-500 dark:text-slate-400">
-              {isConnected ? "Connected" : "Disconnected"}
+              "h-2 w-2 rounded-full",
+              isConnected ? "bg-emerald-500" : "bg-red-500"
+            )} />
+            <span className="text-xs text-slate-600 dark:text-slate-400">
+              {isConnected ? 'Connected' : 'Disconnected'}
             </span>
           </div>
-          
-          {/* Quick action button */}
+
+          {/* Quick Actions */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="text-slate-700 dark:text-slate-300">
-                <Plus size={20} />
+              <Button variant="outline" size="sm" className="hidden md:flex">
+                <Plus className="h-4 w-4 mr-1" />
+                New
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>New</DropdownMenuLabel>
-              <DropdownMenuSeparator />
+            <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem onClick={() => setLocation('/dashboard/projects/new')}>
-                <Package className="mr-2 h-4 w-4" />
-                <span>Project</span>
+                <Package className="h-4 w-4 mr-2" />
+                New Project
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setLocation('/dashboard/pipelines/new')}>
-                <Code className="mr-2 h-4 w-4" />
-                <span>Pipeline</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Plus className="mr-2 h-4 w-4" />
-                <span>API Key</span>
+                <Code className="h-4 w-4 mr-2" />
+                New Pipeline
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
           {/* Notifications */}
-          <NotificationsCenter />uContent>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="relative">
+                <Bell className="h-4 w-4" />
+                {unreadNotifications > 0 && (
+                  <Badge 
+                    variant="destructive" 
+                    className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs"
+                  >
+                    {unreadNotifications}
+                  </Badge>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-80">
+              <NotificationsCenter />
+            </DropdownMenuContent>
           </DropdownMenu>
-          
-          {/* Theme toggle */}
+
+          {/* Theme Toggle */}
           {mounted && (
             <Button
               variant="ghost"
-              size="icon"
-              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className="text-slate-700 dark:text-slate-300"
-              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              size="sm"
+              onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+              className="hidden md:flex"
             >
-              {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+              {theme === 'light' ? (
+                <Moon className="h-4 w-4" />
+              ) : (
+                <Sun className="h-4 w-4" />
+              )}
             </Button>
           )}
-          
-          {/* User profile dropdown */}
+
+          {/* User Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="flex items-center space-x-2 h-9 px-2">
-                <div className="relative">
-                  <img
-                    src={user?.avatar || `https://ui-avatars.com/api/?name=${user?.email || 'User'}&background=random`}
-                    alt={user?.email || 'User'}
-                    className="w-8 h-8 rounded-full border-2 border-slate-200 dark:border-slate-700"
-                  />
-                  <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white dark:border-slate-800"></div>
+              <Button variant="ghost" size="sm" className="flex items-center space-x-2">
+                <div className="h-6 w-6 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-medium">
+                  {user?.name?.charAt(0) || 'U'}
                 </div>
-                <ChevronDown size={16} className="text-slate-500" />
+                <ChevronDown className="h-3 w-3 hidden md:block" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel className="font-normal">
+              <DropdownMenuLabel>
                 <div className="flex flex-col space-y-1">
-                  <p className="font-medium text-sm">{user?.email?.split('@')[0] || 'User'}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{user?.email || 'user@example.com'}</p>
+                  <p className="text-sm font-medium">{user?.name || 'User'}</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">
+                    {user?.email || 'user@example.com'}
+                  </p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setLocation('/dashboard/profile')}>
-                <User className="mr-2 h-4 w-4" />
-                <span>Profile</span>
+              <DropdownMenuItem onClick={() => setLocation('/dashboard/settings')}>
+                <User className="h-4 w-4 mr-2" />
+                Profile
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setLocation('/dashboard/settings')}>
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Settings</span>
+                <Settings className="h-4 w-4 mr-2" />
+                Settings
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => window.open('https://docs.flowforge.dev', '_blank')}>
-                <HelpCircle className="mr-2 h-4 w-4" />
-                <span>Documentation</span>
+              <DropdownMenuItem>
+                <HelpCircle className="h-4 w-4 mr-2" />
+                Help & Support
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => window.open('https://discord.gg/flowforge', '_blank')}>
-                <MessageSquare className="mr-2 h-4 w-4" />
-                <span>Discord Support</span>
+              <DropdownMenuItem>
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Feedback
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout}>
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Logout</span>
+                <LogOut className="h-4 w-4 mr-2" />
+                Log out
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

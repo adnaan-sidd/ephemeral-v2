@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GitHub OAuth Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .button { background: #0366d6; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 10px 0; display: inline-block; text-decoration: none; }
+        .button:hover { background: #0256c4; }
+        .log { background: #f6f8fa; padding: 20px; border-radius: 5px; margin: 20px 0; white-space: pre-wrap; font-family: monospace; max-height: 400px; overflow-y: auto; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+</head>
+<body>
+    <h1>GitHub OAuth Test Page</h1>
+    
+    <button class="button" onclick="testGitHubOAuth()">Test GitHub OAuth</button>
+    <button class="button" onclick="clearLog()">Clear Log</button>
+    
+    <div id="log" class="log">Click "Test GitHub OAuth" to start...</div>
+
+    <script>
+        function log(message, type = 'info') {
+            const logEl = document.getElementById('log');
+            const timestamp = new Date().toISOString().substring(11, 19);
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : '';
+            logEl.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+            logEl.scrollTop = logEl.scrollHeight;
+            console.log(`[${timestamp}] ${message}`);
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        async function testGitHubOAuth() {
+            log('Starting GitHub OAuth test...');
+            
+            try {
+                // Step 1: Get GitHub OAuth URL
+                log('Requesting GitHub OAuth URL from /api/auth/github');
+                const response = await fetch('/api/auth/github');
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    log(`Error getting OAuth URL: ${response.status} - ${errorText}`, 'error');
+                    return;
+                }
+                
+                const data = await response.json();
+                log(`Received OAuth URL: ${data.authUrl}`, 'success');
+                
+                // Step 2: Open GitHub OAuth in new window for testing
+                log('Opening GitHub OAuth in new window...');
+                const authWindow = window.open(data.authUrl, 'github-auth', 'width=600,height=700');
+                
+                // Monitor the auth window
+                const checkClosed = setInterval(() => {
+                    if (authWindow.closed) {
+                        clearInterval(checkClosed);
+                        log('Auth window closed, checking for token...');
+                        
+                        const token = localStorage.getItem('auth_token');
+                        if (token) {
+                            log(`Authentication successful! Token found: ${token.substring(0, 20)}...`, 'success');
+                        } else {
+                            log('No token found in localStorage', 'error');
+                        }
+                    }
+                }, 1000);
+                
+            } catch (error) {
+                log(`Unexpected error: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>

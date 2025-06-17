@@ -18,10 +18,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { Button } from '../../ui/button';
 
 interface DashboardChartProps {
-  title: string;
+  title?: string;
   description?: string;
   data: any[];
-  dataKeys: {
+  dataKeys?: {
     key: string;
     name: string;
     color: string;
@@ -34,6 +34,7 @@ interface DashboardChartProps {
   showTimeRangeControls?: boolean;
   height?: number;
   className?: string;
+  isLoading?: boolean;
 }
 
 // Custom tooltip component
@@ -67,7 +68,7 @@ export default function DashboardChart({
   title,
   description,
   data,
-  dataKeys,
+  dataKeys = [],
   timeRange = '30d',
   onTimeRangeChange,
   type = 'line',
@@ -75,9 +76,39 @@ export default function DashboardChart({
   yAxisFormatter,
   showTimeRangeControls = true,
   height = 300,
-  className
+  className,
+  isLoading = false
 }: DashboardChartProps) {
   const [tooltipVisible, setTooltipVisible] = useState(false);
+  
+  // Auto-generate dataKeys if not provided
+  const effectiveDataKeys = dataKeys.length > 0 ? dataKeys : 
+    data.length > 0 ? Object.keys(data[0])
+      .filter(key => key !== xAxisKey && typeof data[0][key] === 'number')
+      .map((key, index) => ({
+        key,
+        name: key.charAt(0).toUpperCase() + key.slice(1),
+        color: ['#3B82F6', '#8B5CF6', '#10B981', '#F59E0B', '#EF4444'][index % 5]
+      })) : [];
+
+  if (isLoading) {
+    return (
+      <div className="w-full h-64 flex items-center justify-center">
+        <div className="animate-pulse bg-slate-200 dark:bg-slate-700 rounded w-full h-full"></div>
+      </div>
+    );
+  }
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="w-full h-64 flex items-center justify-center text-slate-500 dark:text-slate-400">
+        <div className="text-center">
+          <p className="text-lg font-medium">No data available</p>
+          <p className="text-sm">Chart will appear when data is available</p>
+        </div>
+      </div>
+    );
+  }
   
   const renderChart = () => {
     switch (type) {
@@ -111,7 +142,7 @@ export default function DashboardChart({
               iconSize={8}
               wrapperStyle={{ fontSize: '12px' }}
             />
-            {dataKeys.map((dataKey, index) => (
+            {effectiveDataKeys.map((dataKey, index) => (
               <Line
                 key={index}
                 type="monotone"
@@ -157,7 +188,7 @@ export default function DashboardChart({
               iconSize={8}
               wrapperStyle={{ fontSize: '12px' }}
             />
-            {dataKeys.map((dataKey, index) => (
+            {effectiveDataKeys.map((dataKey, index) => (
               <Area
                 key={index}
                 type="monotone"
@@ -204,7 +235,7 @@ export default function DashboardChart({
               iconSize={8}
               wrapperStyle={{ fontSize: '12px' }}
             />
-            {dataKeys.map((dataKey, index) => (
+            {effectiveDataKeys.map((dataKey, index) => (
               <Bar
                 key={index}
                 dataKey={dataKey.key}

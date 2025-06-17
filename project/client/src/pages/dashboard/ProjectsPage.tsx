@@ -9,11 +9,11 @@ import {
   LayoutGrid,
   List
 } from 'lucide-react';
-import { useAuth } from '../../../lib/auth';
-import DashboardLayout from '../../components/dashboard/layout/DashboardLayout';
-import ProjectCard from '../../components/dashboard/projects/ProjectCard';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
+import { useAuth } from '@/context/AuthContext';
+import DashboardLayout from '@/components/dashboard/layout/DashboardLayout';
+import ProjectCard from '@/components/dashboard/projects/ProjectCard';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,9 +21,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '../../components/ui/dropdown-menu';
-import { useWebSocket } from '../../components/dashboard/layout/DashboardLayout';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
+} from '@/components/ui/dropdown-menu';
+import { useWebSocket } from '@/context/WebSocketContext';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 // Sample project data
 const sampleProjects = [

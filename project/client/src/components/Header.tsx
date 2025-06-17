@@ -1,19 +1,27 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link, useLocation } from 'wouter';
+import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
 import { Menu, X, Github } from 'lucide-react';
 import { FlowForgeLogo } from './ui/logo';
 import ThemeToggle from './ThemeToggle';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from 'next-themes';
+import AuthModal from './auth-modal';
 
-export default function Header() {
+interface HeaderProps {
+  openAuthModal?: (mode: 'login' | 'register') => void;
+}
+
+export default function Header({ openAuthModal }: HeaderProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [location, setLocation] = useLocation();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated, user, logout } = useAuth();
   const { theme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
 
   // After mounting, we can safely show the theme toggle
   useEffect(() => {
@@ -33,11 +41,11 @@ export default function Header() {
   // Close mobile menu when route changes
   useEffect(() => {
     setIsOpen(false);
-  }, [location]);
+  }, [location.pathname]);
 
   const handleLogout = () => {
     logout();
-    setLocation('/');
+    navigate('/');
   };
 
   return (
@@ -51,20 +59,20 @@ export default function Header() {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
-          <Link href="/" className="flex-shrink-0">
+          <RouterLink to="/" className="flex-shrink-0">
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <FlowForgeLogo variant={theme === 'dark' ? 'white' : 'default'} />
             </motion.div>
-          </Link>
+          </RouterLink>
           
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
-            <Link 
-              href="/"
+            <RouterLink 
+              to="/"
               className="text-gray-700 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400 font-medium transition-colors"
             >
               Home
-            </Link>
+            </RouterLink>
             <a 
               href="#features"
               onClick={(e) => {
@@ -95,12 +103,12 @@ export default function Header() {
             >
               FAQ
             </a>
-            <Link 
-              href="/docs"
+            <RouterLink 
+              to="/docs"
               className="text-gray-700 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400 font-medium transition-colors"
             >
               Docs
-            </Link>
+            </RouterLink>
           </nav>
           
           {/* Right side buttons */}
@@ -109,12 +117,12 @@ export default function Header() {
             
             {isAuthenticated ? (
               <div className="flex items-center space-x-4">
-                <Link
-                  href="/dashboard"
+                <RouterLink
+                  to="/dashboard"
                   className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors"
                 >
                   Dashboard
-                </Link>
+                </RouterLink>
                 
                 <div className="relative group">
                   <motion.button 
@@ -131,18 +139,18 @@ export default function Header() {
                   
                   <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg py-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all"
                   >
-                    <Link
-                      href="/dashboard/profile"
+                    <RouterLink
+                      to="/dashboard/profile"
                       className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                     >
                       Profile
-                    </Link>
-                    <Link
-                      href="/dashboard/settings"
+                    </RouterLink>
+                    <RouterLink
+                      to="/dashboard/settings"
                       className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                     >
                       Settings
-                    </Link>
+                    </RouterLink>
                     <button
                       onClick={handleLogout}
                       className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -154,25 +162,37 @@ export default function Header() {
               </div>
             ) : (
               <div className="flex items-center space-x-4">
-                <Link href="/login">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors"
-                  >
-                    Sign in
-                  </motion.button>
-                </Link>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    if (openAuthModal) {
+                      openAuthModal('login');
+                    } else {
+                      setAuthMode('login');
+                      setAuthModalOpen(true);
+                    }
+                  }}
+                  className="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors"
+                >
+                  Sign in
+                </motion.button>
                 
-                <Link href="/register">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
-                  >
-                    Get Started
-                  </motion.button>
-                </Link>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    if (openAuthModal) {
+                      openAuthModal('register');
+                    } else {
+                      setAuthMode('register');
+                      setAuthModalOpen(true);
+                    }
+                  }}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+                >
+                  Get Started
+                </motion.button>
               </div>
             )}
           </div>
@@ -294,18 +314,34 @@ export default function Header() {
                   </>
                 ) : (
                   <div className="space-y-1">
-                    <Link
-                      href="/login"
-                      className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    <motion.button
+                      onClick={() => {
+                        setIsOpen(false);
+                        if (openAuthModal) {
+                          openAuthModal('login');
+                        } else {
+                          setAuthMode('login');
+                          setAuthModalOpen(true);
+                        }
+                      }}
+                      className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
                     >
                       Sign in
-                    </Link>
-                    <Link
-                      href="/register"
-                      className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    </motion.button>
+                    <motion.button
+                      onClick={() => {
+                        setIsOpen(false);
+                        if (openAuthModal) {
+                          openAuthModal('register');
+                        } else {
+                          setAuthMode('register');
+                          setAuthModalOpen(true);
+                        }
+                      }}
+                      className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
                     >
                       Get Started
-                    </Link>
+                    </motion.button>
                   </div>
                 )}
                 <div className="mt-4 px-3">
@@ -316,6 +352,14 @@ export default function Header() {
           </motion.div>
         )}
       </AnimatePresence>
+      
+      {/* Auth Modal */}
+      <AuthModal 
+        open={authModalOpen}
+        onOpenChange={setAuthModalOpen}
+        mode={authMode}
+        onModeChange={setAuthMode}
+      />
     </header>
   );
 }
